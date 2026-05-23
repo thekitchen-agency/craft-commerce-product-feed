@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <!-- Premium vibrant indigo/violet gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Rounded base card -->
+  <rect width="128" height="128" rx="28" fill="url(#bgGrad)" />
+  
+  <!-- Outer Shopping Bag Silhouette -->
+  <path d="M38,44 L90,44 L84,94 L44,94 Z" fill="none" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Bag Handle -->
+  <path d="M52,44 C52,32 76,32 76,44" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- RSS/Feed Waves (Centered on the bag) -->
+  <!-- Wave 1: Center dot -->
+  <circle cx="54" cy="78" r="6" fill="#ffffff" />
+  <!-- Wave 2: Inner arc -->
+  <path d="M54,62 A16,16 0 0,1 70,78" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" />
+  <!-- Wave 3: Outer arc -->
+  <path d="M54,48 A30,30 0 0,1 84,78" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" />
+</svg>

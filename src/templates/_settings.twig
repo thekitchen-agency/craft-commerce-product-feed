@@ -1,0 +1,403 @@
+{# @var plugin \thekitchenagency\craftcommerceproductfeed\CommerceProductFeed #}
+{# @var settings \thekitchenagency\craftcommerceproductfeed\models\Settings #}
+{# @var stats array #}
+{# @var urls array #}
+{# @var fieldOptions array #}
+
+{% import '_includes/forms.twig' as forms %}
+
+<style>
+    .tka-tabs-container {
+        border-bottom: 1px solid #e3e5e8;
+        margin-bottom: 24px;
+    }
+    .tka-tabs-container ul {
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: flex !important;
+        gap: 20px !important;
+    }
+    .tka-tabs-container li {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .tka-tabs-container a.tab {
+        display: block;
+        padding: 10px 0 8px 0;
+        color: #536071 !important;
+        text-decoration: none !important;
+        font-weight: 500 !important;
+        font-size: 14px !important;
+        border-bottom: 2px solid transparent !important;
+        transition: color 0.15s ease;
+    }
+    .tka-tabs-container a.tab:hover {
+        color: #1f2937 !important;
+    }
+    .tka-tabs-container a.tab.sel {
+        color: #0f172a !important;
+        border-bottom-color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+</style>
+
+{# Classic Craft CMS Tab Navigation Bar #}
+<div class="tka-tabs-container tabs">
+    <ul>
+        <li><a id="btn-dashboard" class="tab sel" href="#" onclick="switchTab('dashboard'); return false;">Live Feed Status</a></li>
+        <li><a id="btn-general" class="tab" href="#" onclick="switchTab('general'); return false;">General Config</a></li>
+        <li><a id="btn-mappings" class="tab" href="#" onclick="switchTab('mappings'); return false;">Fields Mapping</a></li>
+    </ul>
+</div>
+
+{# Dashboard / Live Status Tab #}
+<div id="panel-dashboard" class="tka-panel">
+    
+    <div style="margin-bottom: 24px;">
+        <p>Monitor your active product feed configurations, download endpoints, and verify catalog schema requirements.</p>
+    </div>
+
+    {# Standard Craft CMS Data Table for Feed Statuses #}
+    <div class="tableview" style="margin-bottom: 30px;">
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th scope="col">Feed Format</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Cache State</th>
+                    <th scope="col">Cache Size</th>
+                    <th scope="col">Last Generated</th>
+                    <th scope="col" style="text-align: right;">Products</th>
+                    <th scope="col">Validation</th>
+                    <th scope="col">Feed Endpoint URL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for type, info in stats %}
+                    <tr>
+                        <th scope="row" style="font-weight: 600;">
+                            {% if type == 'openai' %}OpenAI Merchant Feed
+                            {% elseif type == 'google' %}Google Shopping (XML)
+                            {% elseif type == 'ricardo' %}Ricardo.ch Feed
+                            {% elseif type == 'csv' %}Generic CSV Feed
+                            {% elseif type == 'meta' %}Meta Catalog Feed (XML)
+                            {% elseif type == 'pinterest' %}Pinterest Catalog (XML)
+                            {% elseif type == 'tiktok' %}TikTok Shop Feed (XML)
+                            {% endif %}
+                        </th>
+                        <td>
+                            {% if info.enabled %}
+                                <span class="status green"></span> Active
+                            {% else %}
+                                <span class="status grey"></span> Disabled
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if info.enabled %}
+                                {% if info.cached %}
+                                    <span class="status green"></span> Cached
+                                {% else %}
+                                    <span class="status orange"></span> Uncached
+                                {% endif %}
+                            {% else %}
+                                <span class="light">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if info.enabled and info.cached %}
+                                {{ (info.size / 1024)|number_format(2) }} KB
+                            {% else %}
+                                <span class="light">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if info.enabled and info.lastUpdated %}
+                                {{ info.lastUpdated|date('Y-m-d H:i:s') }}
+                            {% else %}
+                                <span class="light">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">
+                            {% if info.enabled %}
+                                {{ info.product_count }}
+                            {% else %}
+                                <span class="light">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if info.enabled %}
+                                {% if info.errors|length > 0 %}
+                                    <span style="color: #da5a47; font-weight: 600;">⚠️ {{ info.errors|length }} issues</span>
+                                {% else %}
+                                    <span style="color: #3b8070; font-weight: 600;">✓ Pass</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="light">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if info.enabled %}
+                                <div style="display: flex; align-items: center; gap: 8px; max-width: 320px;">
+                                    <input type="text" class="text fullwidth code" style="font-size: 11px; padding: 4px 6px;" value="{{ urls[type] }}" readonly id="url-{{ type }}">
+                                    <button type="button" class="btn small" onclick="copyUrl('url-{{ type }}', this)">Copy</button>
+                                </div>
+                            {% else %}
+                                <span class="light">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Collapsible Validation Diagnostics (Note Warning Panel) #}
+    {% set hasIssues = false %}
+    {% for type, info in stats %}
+        {% if info.enabled and info.errors|length > 0 %}
+            {% set hasIssues = true %}
+        {% endif %}
+    {% endfor %}
+
+    {% if hasIssues %}
+        <div style="margin-bottom: 30px;">
+            <h3 style="margin-bottom: 12px; font-weight: 600;">Feed Validation Issues</h3>
+            {% for type, info in stats %}
+                {% if info.enabled and info.errors|length > 0 %}
+                    <div class="note warning" style="margin-bottom: 14px;">
+                        <p style="font-weight: 600; margin-bottom: 6px;">
+                            {% if type == 'openai' %}OpenAI Merchant Feed
+                            {% elseif type == 'google' %}Google Shopping (XML)
+                            {% elseif type == 'ricardo' %}Ricardo.ch Feed
+                            {% elseif type == 'csv' %}Generic CSV Feed
+                            {% elseif type == 'meta' %}Meta Catalog Feed (XML)
+                            {% elseif type == 'pinterest' %}Pinterest Catalog (XML)
+                            {% elseif type == 'tiktok' %}TikTok Shop Feed (XML)
+                            {% endif %}
+                        </p>
+                        <ul style="list-style-type: disc; padding-left: 20px; font-size: 13px; line-height: 1.4;">
+                            {% for err in info.errors %}
+                                <li>{{ err }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Cache Actions Panel #}
+    <div class="card" style="padding: 20px; margin-bottom: 24px; border: 1px solid #e3e5e8;">
+        <h3 style="margin-top: 0; margin-bottom: 6px; font-weight: 600;">Manual Cache Regeneration</h3>
+        <p style="margin-bottom: 16px; color: #606d7b; font-size: 13px;">Clear all currently cached feeds and force instant regeneration upon next scraper request.</p>
+        <button type="button" class="btn submit" onclick="triggerClearCache()">Refresh Feed Caches</button>
+    </div>
+</div>
+
+{# General Config Tab #}
+<div id="panel-general" class="tka-panel" style="display: none;">
+    {{ forms.checkboxGroupField({
+        label: 'Active Feed Formats',
+        instructions: 'Choose which product feeds should be generated and accessible publicly.',
+        name: 'enabledFeeds',
+        options: [
+            { label: 'Google Shopping Feed (XML)', value: 'google' },
+            { label: 'OpenAI Merchant Feed (JSON)', value: 'openai' },
+            { label: 'Ricardo.ch Feed (JSON)', value: 'ricardo' },
+            { label: 'Generic Products List (CSV)', value: 'csv' },
+            { label: 'Meta Catalog Feed (XML)', value: 'meta' },
+            { label: 'Pinterest Catalog Feed (XML)', value: 'pinterest' },
+            { label: 'TikTok Shop Feed (XML)', value: 'tiktok' },
+        ],
+        values: settings.enabledFeeds,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Automatic Update Frequency',
+        instructions: 'Set the automatic interval for background updates (warm caches) for enabled feeds.',
+        name: 'updateFrequency',
+        options: [
+            { label: 'Every Hour', value: 'hourly' },
+            { label: 'Twice Daily (12 hours)', value: 'twicedaily' },
+            { label: 'Daily (24 hours)', value: 'daily' },
+            { label: 'Manual Cache Clearing Only', value: 'manual' },
+        ],
+        value: settings.updateFrequency,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Default Product Condition',
+        instructions: 'Default fallback value for Google Shopping and Ricardo feed condition requirements.',
+        name: 'condition',
+        options: [
+            { label: 'New', value: 'new' },
+            { label: 'Used', value: 'used' },
+            { label: 'Refurbished', value: 'refurbished' },
+        ],
+        value: settings.condition,
+    }) }}
+</div>
+
+{# Fields Mapping Tab #}
+<div id="panel-mappings" class="tka-panel" style="display: none;">
+    <div style="background: #f3f5f8; border: 1px solid #e3e5e8; border-radius: 4px; padding: 16px; margin-bottom: 24px;">
+        <h4 style="margin: 0 0 4px 0; font-weight: 600;">Product Custom Field Mappings</h4>
+        <p style="margin: 0; color: #606d7b; font-size: 13px;">Map your custom Craft fields to product feed schema requirements. Mappings will check the Variant element layout first, then fallback to the parent Product layout.</p>
+    </div>
+
+    {{ forms.selectField({
+        label: 'Brand Mapping Field',
+        instructions: 'Select the custom field representing the product brand name.',
+        name: 'brandField',
+        options: fieldOptions,
+        value: settings.brandField,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'GTIN / EAN Mapping Field',
+        instructions: 'Select the custom field representing the barcode identifier.',
+        name: 'gtinField',
+        options: fieldOptions,
+        value: settings.gtinField,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'MPN Mapping Field',
+        instructions: 'Select the custom field representing Manufacturer Part Number.',
+        name: 'mpnField',
+        options: fieldOptions,
+        value: settings.mpnField,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Exclude Product (Lightswitch)',
+        instructions: 'Map a Lightswitch field. When enabled on a product, the product will be excluded from all feed generation.',
+        name: 'excludeField',
+        options: fieldOptions,
+        value: settings.excludeField,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Description Field',
+        instructions: 'Select the custom field (e.g. Rich Text, Plain Text, CKEditor) representing the feed description. If unmapped, the layout will be scanned automatically for standard descriptors.',
+        name: 'descriptionField',
+        options: fieldOptions,
+        value: settings.descriptionField,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Images Field (Assets)',
+        instructions: 'Select the Assets field representing product photos. If unmapped, the first available Assets field will be used.',
+        name: 'imageField',
+        options: fieldOptions,
+        value: settings.imageField,
+    }) }}
+
+    {{ forms.selectField({
+        label: 'Categories Field (Categories)',
+        instructions: 'Select the Categories relation field. If unmapped, the layout will be scanned for a standard categories relation.',
+        name: 'categoryField',
+        options: fieldOptions,
+        value: settings.categoryField,
+    }) }}
+</div>
+
+<script>
+    // Tab switching controls matching classic Craft CMS selector states
+    function switchTab(tabName) {
+        // Toggle selected state on tabs links
+        document.querySelectorAll('.tabs a.tab').forEach(el => {
+            el.classList.remove('sel');
+        });
+        
+        let activeBtn = document.getElementById('btn-' + tabName);
+        if (!activeBtn) {
+            activeBtn = document.getElementById('settings-btn-' + tabName);
+        }
+        if (activeBtn) {
+            activeBtn.classList.add('sel');
+        }
+
+        // Toggle visibility on panels
+        document.querySelectorAll('.tka-panel').forEach(panel => {
+            panel.style.display = 'none';
+        });
+
+        let activePanel = document.getElementById('panel-' + tabName);
+        if (!activePanel) {
+            activePanel = document.getElementById('settings-panel-' + tabName);
+        }
+        if (activePanel) {
+            activePanel.style.display = 'block';
+        }
+    }
+
+    // Copy to clipboard helper
+    function copyUrl(inputId, button) {
+        let input = document.getElementById(inputId);
+        if (!input) {
+            input = document.getElementById('settings-' + inputId);
+        }
+        if (!input) {
+            console.error('Input element with ID ' + inputId + ' not found.');
+            return;
+        }
+
+        input.select();
+        input.setSelectionRange(0, 99999); // For mobile devices
+        
+        const originalText = button.textContent;
+        
+        const successHandler = () => {
+            button.textContent = 'Copied!';
+            button.style.fontWeight = 'bold';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.fontWeight = 'normal';
+            }, 1200);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(successHandler).catch(err => {
+                // Fallback to execCommand if clipboard API fails
+                try {
+                    document.execCommand('copy');
+                    successHandler();
+                } catch (e) {
+                    console.error('Failed to copy text: ', err);
+                }
+            });
+        } else {
+            // Fallback for older browsers or HTTP context
+            try {
+                document.execCommand('copy');
+                successHandler();
+            } catch (e) {
+                console.error('Clipboard API not supported and execCommand failed.');
+            }
+        }
+    }
+
+    // Programmatic cache clearing without nested form parsing errors
+    function triggerClearCache() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '';
+        
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '{{ craft.app.config.general.csrfTokenName }}';
+        csrfInput.value = '{{ craft.app.request.csrfToken }}';
+        form.appendChild(csrfInput);
+        
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'commerce-product-feed/feed/clear-cache';
+        form.appendChild(actionInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
